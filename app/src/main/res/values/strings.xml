@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Cookly</string>
+    <!-- Web Client ID de Firebase (OAuth 2.0), no traducir. -->
+    <string name="google_web_client_id" translatable="false">307032195452-79bi0sj39ppneghjrajorucg8d88e90q.apps.googleusercontent.com</string>
+</resources>
