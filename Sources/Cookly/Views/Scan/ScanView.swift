@@ -59,7 +59,7 @@ struct ScanView: View {
         }
         .sheet(item: $detail) { product in
             NavigationStack {
-                ProductDetailView(product: product, ownerId: viewModel.ownerId)
+                ProductDetailView(product: product, ownerId: viewModel.ownerId, showsAddButton: false)
             }
         }
         .sheet(isPresented: $showManualProduct, onDismiss: {

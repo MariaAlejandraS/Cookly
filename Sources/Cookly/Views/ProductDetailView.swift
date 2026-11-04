@@ -4,12 +4,15 @@ import SwiftUI
 struct ProductDetailView: View {
     @StateObject private var viewModel: ProductDetailViewModel
     private let ownerId: UUID
+    /// Desde Escanear el producto ya quedó guardado: no se muestra "Agregar" para no duplicarlo.
+    private let showsAddButton: Bool
     @State private var showAdd = false
     @State private var showSavedToast = false
     @State private var savedCount = 0
 
-    init(product: OFFProduct, ownerId: UUID) {
+    init(product: OFFProduct, ownerId: UUID, showsAddButton: Bool = true) {
         self.ownerId = ownerId
+        self.showsAddButton = showsAddButton
         _viewModel = StateObject(wrappedValue: ProductDetailViewModel(product: product))
     }
 
@@ -41,12 +44,14 @@ struct ProductDetailView: View {
         .navigationTitle("Detalle")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Button { showAdd = true } label: {
-                Label("Agregar a mi nevera", systemImage: "plus")
+            if showsAddButton {
+                Button { showAdd = true } label: {
+                    Label("Agregar a mi nevera", systemImage: "plus")
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(CooklyTheme.space16)
+                .background(.ultraThinMaterial)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .padding(CooklyTheme.space16)
-            .background(.ultraThinMaterial)
         }
         .task { await viewModel.loadDetail() }
         .sheet(isPresented: $showAdd) {
@@ -108,38 +113,6 @@ struct ProductDetailView: View {
             if let allergens = product.allergens, !allergens.isEmpty {
                 InfoCard(title: "Alérgenos", text: allergens.replacingOccurrences(of: "en:", with: ""))
             }
-        }
-    }
-}
-
-/// ViewModel del detalle de un producto de la API.
-@MainActor
-final class ProductDetailViewModel: ObservableObject {
-    @Published private(set) var product: OFFProduct
-    @Published private(set) var isLoading = false
-    @Published private(set) var errorMessage: String?
-
-    private let api: FoodAPIService
-
-    init(product: OFFProduct, api: FoodAPIService? = nil) {
-        self.product = product
-        self.api = api ?? .shared
-    }
-
-    /// Pide el detalle completo por código de barras (segunda llamada a la API).
-    func loadDetail() async {
-        isLoading = true
-        errorMessage = nil
-        do {
-            product = try await api.fetchProduct(barcode: product.code)
-            isLoading = false
-        } catch is CancellationError {
-            isLoading = false
-        } catch let urlError as URLError where urlError.code == .cancelled {
-            isLoading = false
-        } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            isLoading = false
         }
     }
 }
