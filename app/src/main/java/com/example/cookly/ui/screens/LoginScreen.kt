@@ -1,5 +1,6 @@
 package com.example.cookly.ui.screens
 
+import android.app.Activity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,15 +14,23 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -49,15 +58,14 @@ import com.example.cookly.viewmodel.AuthViewModel
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
-    onForgotPassword: () -> Unit = {},
-    onGoogleClick: () -> Unit = {},
-    onAppleClick: () -> Unit = {},
-    onTermsClick: () -> Unit = {},
-    onPrivacyClick: () -> Unit = {},
     viewModel: AuthViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val colors = MaterialTheme.colorScheme
+    val activity = LocalContext.current as Activity
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showForgotPassword by remember { mutableStateOf(false) }
+    var legalDialog by remember { mutableStateOf<LegalDialogType?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.setForm(AuthForm.LOGIN)
@@ -66,13 +74,20 @@ fun LoginScreen(
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = colors.background
-    ) {
+    LaunchedEffect(uiState.snackbarMessage) {
+        val message = uiState.snackbarMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearSnackbar()
+    }
+
+    Scaffold(
+        containerColor = colors.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .systemBarsPadding()
                 .imePadding()
                 .padding(horizontal = 28.dp)
@@ -148,7 +163,7 @@ fun LoginScreen(
                     color = colors.onSurface,
                     modifier = Modifier
                         .align(Alignment.End)
-                        .clickable(onClick = onForgotPassword)
+                        .clickable { showForgotPassword = true }
                         .padding(vertical = 4.dp)
                 )
 
@@ -167,13 +182,7 @@ fun LoginScreen(
                 SocialLoginButton(
                     text = "Continuar con Google",
                     iconRes = R.drawable.ic_google,
-                    onClick = onGoogleClick
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                SocialLoginButton(
-                    text = "Continuar con Apple",
-                    iconRes = R.drawable.ic_apple,
-                    onClick = onAppleClick
+                    onClick = { viewModel.signInWithGoogle(activity) }
                 )
             }
 
@@ -186,11 +195,26 @@ fun LoginScreen(
             ) {
                 RegisterPrompt(onNavigateToRegister = onNavigateToRegister)
                 LegalDisclaimer(
-                    onTermsClick = onTermsClick,
-                    onPrivacyClick = onPrivacyClick
+                    onTermsClick = { legalDialog = LegalDialogType.TERMS },
+                    onPrivacyClick = { legalDialog = LegalDialogType.PRIVACY }
                 )
             }
         }
+    }
+
+    if (showForgotPassword) {
+        ForgotPasswordDialog(
+            initialEmail = uiState.email,
+            onDismiss = { showForgotPassword = false },
+            onConfirm = { email ->
+                showForgotPassword = false
+                viewModel.sendPasswordReset(email)
+            }
+        )
+    }
+
+    legalDialog?.let { type ->
+        LegalInfoDialog(type = type, onDismiss = { legalDialog = null })
     }
 }
 
@@ -217,6 +241,8 @@ fun RegisterPrompt(onNavigateToRegister: () -> Unit) {
         modifier = Modifier.clickable(onClick = onNavigateToRegister)
     )
 }
+
+enum class LegalDialogType { TERMS, PRIVACY }
 
 @Composable
 fun LegalDisclaimer(
@@ -261,6 +287,67 @@ fun LegalDisclaimer(
         text = annotated,
         style = MaterialTheme.typography.bodySmall,
         textAlign = TextAlign.Center
+    )
+}
+
+@Composable
+fun LegalInfoDialog(
+    type: LegalDialogType,
+    onDismiss: () -> Unit
+) {
+    val (title, body) = when (type) {
+        LegalDialogType.TERMS -> "Términos de servicio" to
+            "Este es un proyecto académico desarrollado para la Universidad del Cauca. " +
+                "Cookly se ofrece con fines educativos: te permite registrar productos de tu nevera " +
+                "y configurar recordatorios de comida. Al usar la app aceptas que es un prototipo " +
+                "sin garantías comerciales."
+        LegalDialogType.PRIVACY -> "Política de privacidad" to
+            "Este es un proyecto académico de la Universidad del Cauca. Los datos de cuenta se " +
+                "gestionan con Firebase Authentication. Los productos y recordatorios se guardan " +
+                "de forma local en el dispositivo, asociados a tu usuario. No vendemos información " +
+                "personal. Documento placeholder hasta contar con política legal definitiva."
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(body) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Entendido") }
+        }
+    )
+}
+
+@Composable
+private fun ForgotPasswordDialog(
+    initialEmail: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var email by remember { mutableStateOf(initialEmail) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Restablecer contraseña") },
+        text = {
+            Column {
+                Text("Te enviaremos un enlace al correo si la cuenta existe.")
+                Spacer(modifier = Modifier.height(12.dp))
+                AuthTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    placeholder = "correoelectrónico@dominio.com",
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Done
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(email) }) { Text("Enviar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
     )
 }
 

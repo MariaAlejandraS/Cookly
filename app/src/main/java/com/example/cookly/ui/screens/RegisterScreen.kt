@@ -20,6 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,8 +30,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -48,19 +55,19 @@ import com.example.cookly.ui.theme.CooklyTheme
 import com.example.cookly.viewmodel.AuthEvent
 import com.example.cookly.viewmodel.AuthForm
 import com.example.cookly.viewmodel.AuthViewModel
+import android.app.Activity
 
 @Composable
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    onGoogleClick: () -> Unit = {},
-    onAppleClick: () -> Unit = {},
-    onTermsClick: () -> Unit = {},
-    onPrivacyClick: () -> Unit = {},
     viewModel: AuthViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val colors = MaterialTheme.colorScheme
+    val activity = LocalContext.current as Activity
+    val snackbarHostState = remember { SnackbarHostState() }
+    var legalDialog by remember { mutableStateOf<LegalDialogType?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.setForm(AuthForm.REGISTER)
@@ -69,8 +76,20 @@ fun RegisterScreen(
         }
     }
 
+    LaunchedEffect(uiState.snackbarMessage) {
+        val message = uiState.snackbarMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearSnackbar()
+    }
+
+    Scaffold(
+        containerColor = colors.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
         color = colors.background
     ) {
         Column(
@@ -121,8 +140,7 @@ fun RegisterScreen(
                             isLoading = uiState.isLoading,
                             onEmailChange = viewModel::onEmailChange,
                             onContinue = viewModel::continueRegister,
-                            onGoogleClick = onGoogleClick,
-                            onAppleClick = onAppleClick
+                            onGoogleClick = { viewModel.signInWithGoogle(activity) }
                         )
                     } else {
                         RegisterDetailsStep(
@@ -152,11 +170,16 @@ fun RegisterScreen(
             ) {
                 LoginPrompt(onNavigateToLogin = onNavigateToLogin)
                 LegalDisclaimer(
-                    onTermsClick = onTermsClick,
-                    onPrivacyClick = onPrivacyClick
+                    onTermsClick = { legalDialog = LegalDialogType.TERMS },
+                    onPrivacyClick = { legalDialog = LegalDialogType.PRIVACY }
                 )
             }
         }
+    }
+    }
+
+    legalDialog?.let { type ->
+        LegalInfoDialog(type = type, onDismiss = { legalDialog = null })
     }
 }
 
@@ -168,8 +191,7 @@ private fun RegisterEmailStep(
     isLoading: Boolean,
     onEmailChange: (String) -> Unit,
     onContinue: () -> Unit,
-    onGoogleClick: () -> Unit,
-    onAppleClick: () -> Unit
+    onGoogleClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     Column(
@@ -220,12 +242,6 @@ private fun RegisterEmailStep(
             text = "Continuar con Google",
             iconRes = R.drawable.ic_google,
             onClick = onGoogleClick
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        SocialLoginButton(
-            text = "Continuar con Apple",
-            iconRes = R.drawable.ic_apple,
-            onClick = onAppleClick
         )
     }
 }
