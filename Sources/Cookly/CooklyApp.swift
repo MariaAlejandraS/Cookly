@@ -5,9 +5,12 @@ import SwiftUI
 /// No se usa .modelContainer aquí: el store es el único dueño del ModelContainer.
 @main
 struct CooklyApp: App {
+    @StateObject private var session = SessionManager()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(session)
         }
     }
 }

@@ -2,15 +2,22 @@ import SwiftUI
 
 /// Nevera: héroe, filtros con @Binding, tarjetas y botón flotante.
 struct NeveraView: View {
-    var onSearch: () -> Void = {}
-    @StateObject private var viewModel = NeveraViewModel()
-    @AppStorage("userName") private var userName = ""
+    @StateObject private var viewModel: NeveraViewModel
+    @EnvironmentObject private var session: SessionManager
+    private let ownerId: UUID
+    private let onSearch: () -> Void
     @State private var showAdd = false
     @State private var productToEdit: Product?
     @State private var productToDelete: Product?
     @State private var showSavedToast = false
     @State private var savedCount = 0
     @State private var fabTaps = 0
+
+    init(ownerId: UUID, onSearch: @escaping () -> Void = {}) {
+        self.ownerId = ownerId
+        self.onSearch = onSearch
+        _viewModel = StateObject(wrappedValue: NeveraViewModel(ownerId: ownerId))
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,10 +30,10 @@ struct NeveraView: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $viewModel.searchText, prompt: "Buscar en mi nevera")
             .sheet(isPresented: $showAdd, onDismiss: { viewModel.load() }) {
-                AddProductView(viewModel: AddProductViewModel(), onSaved: markSaved)
+                AddProductView(viewModel: AddProductViewModel(ownerId: ownerId), onSaved: markSaved)
             }
             .sheet(item: $productToEdit, onDismiss: { viewModel.load() }) { product in
-                AddProductView(viewModel: AddProductViewModel(product: product))
+                AddProductView(viewModel: AddProductViewModel(product: product, ownerId: ownerId))
             }
             .confirmationDialog("¿Eliminar este producto?",
                                 isPresented: Binding(get: { productToDelete != nil },
@@ -56,10 +63,10 @@ struct NeveraView: View {
                         IllustratedEmpty(
                             symbol: "refrigerator.fill",
                             title: "Tu nevera está vacía",
-                            message: "Agrega un alimento o búscalo por nombre.",
+                            message: "Agrega un alimento o escanea su código.",
                             primaryTitle: "Agregar producto",
                             primaryAction: { showAdd = true },
-                            secondaryTitle: "Buscar producto",
+                            secondaryTitle: "Escanear código",
                             secondaryAction: onSearch
                         )
                     }
@@ -102,7 +109,7 @@ struct NeveraView: View {
 
     private var hero: some View {
         VStack(alignment: .leading, spacing: CooklyTheme.space16) {
-            Text("Hola, \(userName)")
+            Text("Hola, \(session.currentUser?.name ?? "")")
                 .font(CooklyTheme.rounded(.title, weight: .bold))
                 .foregroundStyle(CooklyTheme.onGradient)
             HStack {

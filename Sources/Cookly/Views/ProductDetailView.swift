@@ -3,11 +3,13 @@ import SwiftUI
 /// Detalle de Open Food Facts y alta en la nevera.
 struct ProductDetailView: View {
     @StateObject private var viewModel: ProductDetailViewModel
+    private let ownerId: UUID
     @State private var showAdd = false
     @State private var showSavedToast = false
     @State private var savedCount = 0
 
-    init(product: OFFProduct) {
+    init(product: OFFProduct, ownerId: UUID) {
+        self.ownerId = ownerId
         _viewModel = StateObject(wrappedValue: ProductDetailViewModel(product: product))
     }
 
@@ -48,7 +50,7 @@ struct ProductDetailView: View {
         }
         .task { await viewModel.loadDetail() }
         .sheet(isPresented: $showAdd) {
-            AddProductView(viewModel: AddProductViewModel(from: viewModel.product), onSaved: {
+            AddProductView(viewModel: AddProductViewModel(from: viewModel.product, ownerId: ownerId), onSaved: {
                 savedCount += 1
                 showSavedToast = true
             })
@@ -106,6 +108,38 @@ struct ProductDetailView: View {
             if let allergens = product.allergens, !allergens.isEmpty {
                 InfoCard(title: "Alérgenos", text: allergens.replacingOccurrences(of: "en:", with: ""))
             }
+        }
+    }
+}
+
+/// ViewModel del detalle de un producto de la API.
+@MainActor
+final class ProductDetailViewModel: ObservableObject {
+    @Published private(set) var product: OFFProduct
+    @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
+
+    private let api: FoodAPIService
+
+    init(product: OFFProduct, api: FoodAPIService? = nil) {
+        self.product = product
+        self.api = api ?? .shared
+    }
+
+    /// Pide el detalle completo por código de barras (segunda llamada a la API).
+    func loadDetail() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            product = try await api.fetchProduct(barcode: product.code)
+            isLoading = false
+        } catch is CancellationError {
+            isLoading = false
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            isLoading = false
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            isLoading = false
         }
     }
 }

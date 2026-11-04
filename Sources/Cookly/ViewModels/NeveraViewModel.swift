@@ -12,6 +12,7 @@ final class NeveraViewModel: ObservableObject {
     @Published var filter: StatusFilter = .all
 
     private let repository: any LocalStore
+    private let ownerId: UUID
     private var changesCancellable: AnyCancellable?
 
     enum StatusFilter: String, CaseIterable, Identifiable {
@@ -21,12 +22,12 @@ final class NeveraViewModel: ObservableObject {
         var id: String { rawValue }
     }
 
-    init(repository: (any LocalStore)? = nil) {
+    init(ownerId: UUID, repository: (any LocalStore)? = nil) {
         let store = repository ?? PersistenceFactory.make()
         self.repository = store
+        self.ownerId = ownerId
         changesCancellable = nil
         load()
-        // El publisher refresca la lista aunque esta pestaña no vuelva a .onAppear.
         changesCancellable = store.changes.sink { [weak self] _ in
             Task { @MainActor in
                 withAnimation(.snappy) { self?.load() }
@@ -35,7 +36,7 @@ final class NeveraViewModel: ObservableObject {
     }
 
     func load() {
-        products = repository.fetchProducts()
+        products = repository.fetchProducts(ownerId: sessionOwner ?? ownerId)
     }
 
     /// Lista que ve la pantalla: aplica búsqueda y filtro.
@@ -56,7 +57,10 @@ final class NeveraViewModel: ObservableObject {
     var soonCount: Int { products.filter { $0.status == .soon }.count }
 
     func delete(_ product: Product) {
-        repository.delete(product)
+        guard let owner = sessionOwner else { return }
+        repository.delete(product, ownerId: owner)
         load()
     }
+
+    private var sessionOwner: UUID? { SessionManager.shared?.currentUser?.id }
 }

@@ -4,12 +4,6 @@ import Foundation
 // Codable = Decodable + Encodable; JSONDecoder los llena automáticamente
 // (equivale a usar Gson/Moshi o kotlinx.serialization en Android).
 
-/// Respuesta de búsqueda: GET /cgi/search.pl?...&json=1
-struct OFFSearchResponse: Decodable {
-    let count: Int?
-    let products: [OFFProduct]
-}
-
 /// Respuesta de producto por código de barras: GET /api/v2/product/{code}.json
 struct OFFProductResponse: Decodable {
     let status: Int          // 1 = encontrado, 0 = no existe
@@ -31,8 +25,17 @@ struct OFFProduct: Decodable, Identifiable, Hashable {
     var id: String { code }
 
     var displayName: String {
-        let name = productName?.trimmingCharacters(in: .whitespaces) ?? ""
+        let name = productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return name.isEmpty ? "Producto sin nombre" : name
+    }
+
+    /// Nombre listo para guardar. Vacío → el escáner pide datos, no inserta.
+    var usableName: String? {
+        let trimmed = productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty { return trimmed }
+        let fallback = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if fallback.isEmpty || fallback == "Producto sin nombre" { return nil }
+        return fallback
     }
 
     /// Las claves del JSON vienen en snake_case; aquí las mapeamos a camelCase.

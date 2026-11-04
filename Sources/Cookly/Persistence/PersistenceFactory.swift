@@ -24,11 +24,15 @@ enum PersistenceFactory {
     }
 
     private static func open() -> (store: any LocalStore, name: String) {
+        #if NO_SWIFTDATA
+        return (JSONStore(), "JSON (respaldo)")
+        #else
         do {
             return (try SwiftDataStore(), "SwiftData")
         } catch {
             print("AVISO Cookly: SwiftData no abrió (\(error.localizedDescription)). Almacenamiento activo: JSON (respaldo).")
             return (JSONStore(), "JSON (respaldo)")
         }
+        #endif
     }
 }

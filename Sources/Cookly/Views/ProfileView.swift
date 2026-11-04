@@ -2,21 +2,16 @@ import SwiftUI
 
 /// Perfil. El nombre se edita en un borrador: vaciar el campo no vuelve a la bienvenida.
 struct ProfileView: View {
-    @AppStorage("userName") private var userName = ""
+    @EnvironmentObject private var session: SessionManager
     @AppStorage("darkMode") private var darkMode = false
     @AppStorage("warningDays") private var warningDays = 3
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var nameDraft: String
+    @State private var nameDraft = ""
     @State private var nameError: String?
     @State private var allowNameCommit = true
     @FocusState private var nameFieldFocused: Bool
     @State private var showLogout = false
-
-    init() {
-        let stored = UserDefaults.standard.string(forKey: "userName") ?? ""
-        _nameDraft = State(initialValue: stored)
-    }
 
     var body: some View {
         NavigationStack {
@@ -33,15 +28,20 @@ struct ProfileView: View {
             .cooklyScreen()
             .navigationTitle("Perfil")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if nameDraft.isEmpty {
+                    nameDraft = session.currentUser?.name ?? ""
+                }
+            }
             .onDisappear {
-                guard !userName.isEmpty else { return }
+                guard session.currentUser != nil else { return }
                 commitName()
             }
             .alert("¿Cerrar sesión?", isPresented: $showLogout) {
                 Button("Cancelar", role: .cancel) {}
                 Button("Cerrar sesión", role: .destructive) {
                     allowNameCommit = false
-                    userName = ""
+                    session.logout()
                 }
             } message: {
                 Text("Tus productos seguirán guardados en este dispositivo.")
@@ -51,11 +51,14 @@ struct ProfileView: View {
 
     private var header: some View {
         VStack(spacing: CooklyTheme.space12) {
-            InitialsAvatar(name: userName, size: 96)
-            Text(userName)
+            InitialsAvatar(name: session.currentUser?.name ?? "", size: 96)
+            Text(session.currentUser?.name ?? "")
                 .font(CooklyTheme.rounded(.title, weight: .bold))
                 .foregroundStyle(CooklyTheme.ink)
                 .multilineTextAlignment(.center)
+            Text(session.currentUser?.username ?? "")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, CooklyTheme.space8)
@@ -80,6 +83,14 @@ struct ProfileView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(CooklyTheme.danger)
             }
+            Text("Usuario")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(session.currentUser?.username ?? "")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(CooklyTheme.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cooklyField()
         }
         .cardStyle()
     }
@@ -100,7 +111,7 @@ struct ProfileView: View {
 
     private var aboutLink: some View {
         NavigationLink {
-            AboutView()
+            AboutView(userName: session.currentUser?.name ?? "")
         } label: {
             HStack(spacing: CooklyTheme.space12) {
                 IconTile(systemName: "info.circle.fill")
@@ -131,12 +142,12 @@ struct ProfileView: View {
         guard allowNameCommit else { return }
         let trimmed = nameDraft.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else {
-            nameDraft = userName
+            nameDraft = session.currentUser?.name ?? ""
             nameError = "El nombre no puede quedar vacío."
             return
         }
         nameError = nil
-        userName = trimmed
+        session.updateName(trimmed)
         nameDraft = trimmed
     }
 }

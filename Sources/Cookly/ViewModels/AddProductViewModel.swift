@@ -15,10 +15,10 @@ final class AddProductViewModel: ObservableObject {
         didSet { if autoDate { applySuggestedDate() } }
     }
     @Published var isOpened = false
-    @Published var notes = ""
     @Published var errorMessage: String?
 
     private let repository: any LocalStore
+    private let ownerId: UUID
     private(set) var editing: Product?
     private var barcode: String?
     private var imageURL: String?
@@ -27,28 +27,29 @@ final class AddProductViewModel: ObservableObject {
     var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 
     /// Si recibe un producto, el formulario queda en modo edición.
-    init(product: Product? = nil, repository: (any LocalStore)? = nil) {
+    init(product: Product? = nil, ownerId: UUID, barcode: String? = nil, repository: (any LocalStore)? = nil) {
         self.repository = repository ?? PersistenceFactory.make()
-        if let p = product {
-            editing = p
-            name = p.name
-            category = p.category
-            quantity = p.quantity
-            expirationDate = p.expirationDate
-            isOpened = p.isOpened
-            notes = p.notes
+        self.ownerId = ownerId
+        if let product {
+            editing = product
+            name = product.name
+            category = product.category
+            quantity = product.quantity
+            expirationDate = product.expirationDate
+            isOpened = product.isOpened
             autoDate = false
-            barcode = p.barcode
-            imageURL = p.imageURL
+            self.barcode = product.barcode
+            imageURL = product.imageURL
         } else {
+            self.barcode = barcode
             applySuggestedDate()
         }
     }
 
     /// Modo "agregar desde la API": llena el formulario con lo que devolvió Open Food Facts.
-    convenience init(from offProduct: OFFProduct) {
-        self.init()
-        name = offProduct.displayName
+    convenience init(from offProduct: OFFProduct, ownerId: UUID) {
+        self.init(ownerId: ownerId)
+        name = offProduct.usableName ?? ""
         barcode = offProduct.code
         imageURL = offProduct.imageURL
         category = FoodCategory.from(offTags: offProduct.categoriesTags ?? [])
@@ -57,7 +58,9 @@ final class AddProductViewModel: ObservableObject {
 
     /// Hoy + el mínimo de la categoría (el extremo corto, por seguridad alimentaria).
     func applySuggestedDate() {
-        expirationDate = Calendar.current.date(byAdding: .day, value: category.minDays, to: .now) ?? .now
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        expirationDate = calendar.date(byAdding: .day, value: category.minDays, to: today) ?? today
     }
 
     /// Valida y guarda. Devuelve true si se guardó, para que la vista se cierre.
@@ -72,23 +75,26 @@ final class AddProductViewModel: ObservableObject {
             return false
         }
 
-        if var p = editing {
-            p.name = trimmed
-            p.category = category
-            p.quantity = quantity
-            p.expirationDate = expirationDate
-            p.isOpened = isOpened
-            p.notes = notes
-            repository.update(p)
+        guard let owner = SessionManager.shared?.currentUser?.id else { return false }
+        if var product = editing {
+            guard product.ownerId == owner else { return false }
+            product.name = trimmed
+            product.category = category
+            product.quantity = quantity
+            product.expirationDate = expirationDate
+            product.isOpened = isOpened
+            repository.update(product, ownerId: owner)
         } else {
-            repository.insert(Product(name: trimmed,
-                                      category: category,
-                                      quantity: quantity,
-                                      expirationDate: expirationDate,
-                                      isOpened: isOpened,
-                                      notes: notes,
-                                      barcode: barcode,
-                                      imageURL: imageURL))
+            repository.insert(Product(
+                name: trimmed,
+                category: category,
+                quantity: quantity,
+                expirationDate: expirationDate,
+                isOpened: isOpened,
+                barcode: barcode,
+                imageURL: imageURL,
+                ownerId: owner
+            ))
         }
         return true
     }

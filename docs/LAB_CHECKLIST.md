@@ -2,47 +2,67 @@
 
 Orden fijo. No saltes al paso 2 con la app en rojo. Si un síntoma está en `PLAN_B.md`, aplícalo y vuelve al mismo número.
 
-Antes de salir de casa: en `Sources/Cookly/Network/FoodAPIService.swift` línea 36, cambia `tu.correo@unicauca.edu.co` por tu correo institucional. Xcode marca el `TODO` de la línea 35.
-
 ## 1. Crear el proyecto y compilar
 
-Sigue `XCODE_SETUP.md` de arriba a abajo. Criterio de salida: ⌘R muestra «COOKLY» y el campo del nombre, sin crash.
+Sigue `XCODE_SETUP.md` de arriba a abajo, incluido el permiso de cámara del paso 5, antes de ⌘R. Criterio de salida: la app abre en el inicio de sesión, sin crash.
 
-Si SwiftData muere en el arranque, cambia `PersistenceFactory.swift:12` a `JSONStore()` **ahora**, limpia y vuelve a correr. No lo dejes para la mitad de la demo.
+Si SwiftData muere en el arranque, aplica la fila de SwiftData en `PLAN_B.md` ahora. No lo dejes para la mitad de la demo.
 
-## 2. Probar cada requisito en vivo
+## 2. Dos cuentas, cada una con su nevera
 
-1. **Bienvenida.** Escribe un nombre y pulsa Empezar. Deben aparecer cuatro pestañas.
-2. **Formulario.** Nevera > +. Categoría «Carne molida». El pie debe decir: «Recomendado: 1 a 2 días en refrigeración. La fecha sugerida usa el mínimo; ajústala según el empaque.» La fecha sugerida es mañana (hoy + 1). Cuenta las categorías del Picker: tienen que ser 11. Usa el Stepper y los dos Toggle. Guarda.
-3. **Persistencia.** Stop en Xcode (no solo Home). ⌘R. El producto sigue ahí. Entra, edita el nombre, guarda. Desliza y confirma eliminar; desaparece. Vuelve a crear uno para la captura.
-4. **Red.** Pestaña Buscar. Código `3017624010701` y Buscar: es Nutella (u otro producto de ese código) y al tocarlo el detalle hace una segunda consulta. Vuelve, busca `leche`: lista de resultados. Abre uno, «Agregar a mi nevera», guarda. Cambia a Nevera **sin** cerrar la app: el producto nuevo tiene que estar (lo empuja el publisher, no `.onAppear`).
-5. **Sin internet.** Apaga el Wi‑Fi del Mac (el simulador usa esa red). Busca `leche`. El texto debe ser español («Sin conexión…», «Se perdió la conexión…» o «La consulta tardó…»), no inglés. Prueba también una sola letra: el aviso «Escribe al menos 2 letras.» no debe usar la pantalla de «Algo salió mal». Vuelve a encender el Wi‑Fi.
-6. **Recordatorios.** Crea uno, márcalo, Stop, ⌘R: sigue guardado.
-7. **Perfil.** Borra el nombre y sal del campo: **no** debe volver a Bienvenida; el nombre regresa y avisa que no puede quedar vacío. Escribe otro nombre, vuelve a Nevera y el título debe decir «Hola, …». Activa Modo oscuro y mira el wordmark y los iconos (el acento `#2FBDA8` en oscuro). Mueve el Stepper de días. Entra a Acerca de y confirma los dos nombres. Cerrar sesión **sí** vuelve a Bienvenida; los productos no se borran. Vuelve a entrar con tu nombre para las capturas.
+1. Regístrate (nombre, usuario y contraseña de al menos 8 caracteres, con letra y número).
+2. En Nevera agrega un producto con un nombre reconocible, por ejemplo «Leche de Ana».
+3. Perfil > Cerrar sesión.
+4. Registra una segunda cuenta. Su Nevera debe estar vacía: no debe verse «Leche de Ana».
+5. Agrega otro producto, por ejemplo «Pan de Luis». Cierra sesión.
+6. Entra con la primera cuenta. Solo debe estar «Leche de Ana».
 
-Si en el paso 4 la otra pestaña no se entera, no sigas: es la fila del publisher en `PLAN_B.md`.
+## 3. Cinco contraseñas mal seguidas
 
-## 3. Capturas (⌘S en el Simulador)
+En el inicio de sesión, escribe un usuario que exista y una contraseña incorrecta. Repite cinco veces. Debe aparecer «Demasiados intentos. Intenta de nuevo en N s.» y el botón de entrar no debe dejar pasar hasta que el contador llegue a cero. Luego entra con la contraseña buena.
+
+## 4. Código real, ingreso manual
+
+Pestaña Escanear. En el simulador no hay cámara: usa el campo de código. Escribe `3017624010701` y busca.
+
+El producto se agrega solo, con categoría y fecha sugerida. No hace falta pulsar Guardar. Pasa a Nevera: el producto está ahí. Si la categoría es 1 día, la tarjeta del escaneo dice «Vence mañana (sugerido)»; si son más, «Vence en N días (sugerido)».
+
+## 5. Código que no existe
+
+En Escanear, ingreso manual, escribe `00000000`. Debe decir «No encontramos este código». Pulsa «Agregar manualmente» y completa el formulario a mano.
+
+## 6. Editar y deshacer
+
+Escanea o ingresa otro código que sí exista. En la tarjeta del producto:
+
+- Editar: cambia el nombre o la fecha, guarda, y comprueba el cambio en Nevera.
+- Deshacer: el producto desaparece de la nevera.
+
+## 7. Recordatorio que se repite
+
+Pestaña Recordatorios. Crea uno con «Se repite» y al menos un día de la semana. Márcalo hecho. Stop en Xcode y ⌘R: sigue guardado.
+
+## 8. Modo oscuro
+
+Perfil > Modo oscuro. Revisa Nevera, Escanear y Perfil: el fondo no queda blanco y el texto se lee. Apaga el interruptor y vuelve el tema claro.
+
+## 9. Cerrar sesión
+
+Perfil > Cerrar sesión. Vuelve el inicio de sesión. Entra de nuevo: los productos de esa cuenta siguen.
+
+## 10. Sin internet
+
+Apaga el Wi‑Fi del Mac (el simulador usa esa red). En Escanear, ingreso manual de `3017624010701`. El texto debe ser español («Sin conexión…», «Se perdió la conexión…» o «La consulta tardó…»), no inglés. Vuelve a encender el Wi‑Fi.
+
+## 11. Capturas (⌘S en el Simulador)
 
 Con datos en pantalla, no con listas vacías:
 
-1. Bienvenida (wordmark COOKLY).
-2. Nevera con al menos un producto y su etiqueta de color.
-3. Agregar, con el pie de «Recomendado: X a Y días…» visible.
-4. Buscar con resultados de «leche» o del código.
-5. Detalle de un producto.
-6. Recordatorios con uno creado.
-7. Acerca de, con los dos nombres.
+1. Inicio de sesión, con el wordmark COOKLY.
+2. Nevera de una cuenta, con su producto y la pastilla de vencimiento.
+3. Escanear, con el producto agregado a partir de `3017624010701`.
+4. «No encontramos este código».
+5. Recordatorios, con uno que se repite.
+6. Perfil en modo oscuro y Acerca de, con los dos nombres.
 
-Si queda un minuto: Perfil en modo oscuro (Toggle, Stepper y contraste).
-
-## 4. Commit de lo que se corrigió en el lab
-
-Esta copia **no tiene `.git`**. No hay ramas `maria` ni `santiago` aquí, aunque el README las nombre.
-
-- Si el trabajo oficial está en GitHub, lleva estos archivos a ese repo y haz el commit en **tu** rama.
-- Si el profesor espera el repo y todavía no existe, créalo con el equipo; no lo inicialicé yo.
-- No hagas `push --force`. No subas un `.bak` ni carpetas `.build`.
-- El commit de la visita es solo lo que hayas tenido que tocar en el Mac (la línea de `JSONStore()`, un símbolo, el correo). El resto ya está en estos archivos.
-
-Mensaje corto, por ejemplo: `Ajusta el almacén y lo verificado en el simulador del laboratorio.`
+La cámara solo se prueba en un iPhone físico. En el simulador basta el ingreso manual. Si Escanear dice «Falta NSCameraUsageDescription», falta el paso 5 de `XCODE_SETUP.md`; el ingreso manual igual debe funcionar.

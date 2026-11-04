@@ -46,17 +46,26 @@ Target > Build Settings, busca y deja exactamente:
 
 Eso alinea el proyecto con `Package.swift` (`.swiftLanguageMode(.v5)`). Un proyecto nuevo de Xcode reciente puede traer Default Actor Isolation = MainActor; con eso salen errores de `shared` y de inits que aquí no se pueden comprobar.
 
-## 5. Correr
+## 5. Permiso de cámara, antes de correr
+
+Target Cookly > pestaña **Info**. En Custom iOS Target Properties pulsa **+** y agrega:
+
+- Clave: **Privacy - Camera Usage Description** (`NSCameraUsageDescription`)
+- Valor: `Cookly usa la cámara para leer códigos de barras de tus alimentos.`
+
+Sin esa clave, la pestaña Escanear muestra el aviso «Falta NSCameraUsageDescription» y solo funciona el ingreso manual del código. El simulador no tiene cámara: ahí se prueba solo el ingreso manual. La cámara se prueba en un iPhone físico.
+
+## 6. Correr
 
 1. Arriba a la izquierda, elige un simulador iPhone con iOS 17 o superior.
 2. Si pide Team, elige el Apple ID del laboratorio (Personal Team). El simulador no necesita cuenta de pago.
 3. ⌘R.
 
-La primera pantalla es la bienvenida. Si se cierra al instante con el texto «SwiftData no pudo abrir la base», ve a `PLAN_B.md` fila de SwiftData **antes** de cargar datos de la demo.
+La primera pantalla es el inicio de sesión. Si se cierra al instante con el texto «SwiftData no pudo abrir la base», ve a `PLAN_B.md` fila de SwiftData **antes** de cargar datos de la demo.
 
 Consola: View > Debug Area > Activate Console. Los `print` de guardado salen ahí.
 
-## 6. Icono y capturas
+## 7. Icono y capturas
 
 - Icono: abre `Assets.xcassets` > `AppIcon` y suelta el PNG de 1024×1024 en el único hueco. Un solo tamaño, sin alfa, si el catálogo lo exige.
 - Capturas: con el Simulador al frente, ⌘S. El archivo cae en el Escritorio.
@@ -64,5 +73,5 @@ Consola: View > Debug Area > Activate Console. Los `print` de guardado salen ah�
 ## Qué no hace falta tocar
 
 - No hace falta excepción de App Transport Security: Open Food Facts es `https`.
-- No hace falta permiso de cámara ni de ubicación.
+- No hace falta permiso de ubicación. El de cámara sí: es el paso 5.
 - `xtool.yml` no lo lee este proyecto de Xcode.

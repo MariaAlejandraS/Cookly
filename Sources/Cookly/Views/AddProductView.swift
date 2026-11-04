@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Alta y edición. La cuadrícula elige la categoría; el Picker la muestra en menú.
+/// Alta y edición. La cuadrícula elige la categoría.
 struct AddProductView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject var viewModel: AddProductViewModel
@@ -17,7 +17,6 @@ struct AddProductView: View {
                 VStack(spacing: CooklyTheme.space16) {
                     productCard
                     dateCard
-                    notesCard
                     adviceCard
                 }
                 .padding(CooklyTheme.space16)
@@ -42,14 +41,10 @@ struct AddProductView: View {
             TextField("Nombre (ej. Leche entera)", text: $viewModel.name)
                 .textInputAutocapitalization(.sentences)
                 .cooklyField()
-            Picker("Categoría", selection: $viewModel.category) {
-                ForEach(FoodCategory.allCases) { category in
-                    Text(category.rawValue).tag(category)
-                }
-            }
-            .pickerStyle(.menu)
             CategoryGrid(selection: $viewModel.category)
             Stepper("Cantidad: \(viewModel.quantity)", value: $viewModel.quantity, in: 1...99)
+                .frame(minHeight: 44)
+            Toggle("Empaque abierto", isOn: $viewModel.isOpened)
                 .frame(minHeight: 44)
         }
         .cardStyle()
@@ -64,16 +59,6 @@ struct AddProductView: View {
                        in: Date.now.addingTimeInterval(-86400 * 30)...,
                        displayedComponents: .date)
                 .disabled(viewModel.autoDate)
-        }
-        .cardStyle()
-    }
-
-    private var notesCard: some View {
-        VStack(alignment: .leading, spacing: CooklyTheme.space12) {
-            Toggle("Empaque abierto", isOn: $viewModel.isOpened)
-            TextField("Notas (opcional)", text: $viewModel.notes, axis: .vertical)
-                .lineLimit(2...4)
-                .cooklyField()
         }
         .cardStyle()
     }

@@ -19,7 +19,11 @@ let package = Package(
             name: "Cookly",
             // Modo Swift 5: evita que los chequeos estrictos de concurrencia de Swift 6
             // bloqueen la compilación por detalles que no afectan esta app.
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+                // xtool lee este paquete. Xcode no: allí el flag no existe y SwiftData sigue activo.
+                .define("NO_SWIFTDATA"),
+            ]
         ),
     ]
 )

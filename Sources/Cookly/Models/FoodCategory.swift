@@ -74,41 +74,46 @@ enum FoodCategory: String, CaseIterable, Identifiable, Codable {
     /// Una etiqueta concreta (manzana, pollo) le gana a la genérica (`en:fruits`, `en:meats`).
     /// Solo ante una etiqueta genérica se elige el mínimo: fruta → blandas (1), carne → molida (1).
     static func from(offTags: [String]) -> FoodCategory {
-        let tags = offTags.joined(separator: " ").lowercased()
-        let plantBased = hits(tags, ["vegan", "vegetarian", "plant", "coconut", "almond", "soy", "oat"])
+        let words = tokens(from: offTags)
+        // Una lata cerrada no es pescado crudo: «Otros/enlatados» ya cubre 3–5 días.
+        if hits(words, ["canned", "tinned", "conserve", "enlatado"]) {
+            return .otros
+        }
+        let plantBased = hits(words, ["vegan", "vegetarian", "plant", "coconut", "almond", "soy", "oat", "alternatives", "analogues", "substitutes", "tofu", "tempeh", "seitan"])
+        let isDrink = hits(words, ["fruit-juices", "juice", "juices", "drink", "drinks", "beverage", "beverages", "nectar", "soda", "tea", "coffee", "water"])
         var matches: [FoodCategory] = []
 
-        if !plantBased && hits(tags, ["ground-meat", "ground-beef", "ground-pork", "minced", "mince", "hamburger", "meatball"]) {
+        if !plantBased && hits(words, ["ground-meat", "ground-beef", "ground-pork", "minced", "mince", "hamburger", "meatball"]) {
             matches.append(.carneMolida)
         }
-        if !plantBased && hits(tags, ["chicken", "turkey", "poultry", "pollo", "pavo"]) {
+        if !plantBased && hits(words, ["chicken", "chickens", "turkey", "poultry", "pollo", "pavo"]) {
             matches.append(.polloPavo)
         }
-        if !plantBased && hits(tags, ["fish", "seafood", "shellfish", "salmon", "tuna", "shrimp", "prawn", "sardine"]) {
+        if !plantBased && hits(words, ["fish", "seafood", "shellfish", "salmon", "tuna", "shrimp", "prawn", "sardine", "poisson", "pescado"]) {
             matches.append(.pescadoMariscos)
         }
-        if !plantBased && hits(tags, ["sausage", "salami", "ham", "chorizo", "bacon", "charcuterie", "cold-cut", "deli"]) {
+        if !plantBased && hits(words, ["sausage", "sausages", "salami", "ham", "chorizo", "bacon", "charcuterie", "cold-cut", "deli", "jambon", "embutido"]) {
             matches.append(.embutidos)
         }
-        if hits(tags, ["leftover", "ready-meal", "cooked"]) {
+        if hits(words, ["leftover", "ready-meal", "cooked"]) {
             matches.append(.comidaCocida)
         }
-        if !plantBased && hits(tags, ["steak", "roast", "chop", "beef", "pork", "lamb", "veal"]) {
+        if !plantBased && hits(words, ["steak", "roast", "chop", "beef", "pork", "lamb", "veal"]) {
             matches.append(.cortesCarne)
         }
-        if !plantBased && hits(tags, ["dairy", "dair", "milk", "cheese", "yogurt", "yoghurt", "butter"]) {
+        if !plantBased && hits(words, ["dairy", "dairies", "milk", "milks", "cheese", "cheeses", "yogurt", "yogurts", "yoghurt", "butter", "lait", "leche", "fromage", "queso", "yaourt", "yogur"]) {
             matches.append(.lacteosAbiertos)
         }
-        if hits(tags, ["lettuce", "spinach", "salad", "kale", "chard", "arugula", "cabbage", "leafy", "vegetable", "verdura"]) {
+        if hits(words, ["lettuce", "spinach", "salad", "kale", "chard", "arugula", "cabbage", "leafy", "vegetable", "vegetables", "verdura", "legume"]) {
             matches.append(.verdurasHoja)
         }
-        if hits(tags, ["berry", "strawberry", "raspberry", "blueberry", "blackberry", "banana", "peach", "plum", "grape", "kiwi", "mango", "melon", "cherry", "pineapple", "tomato", "apricot"]) {
+        if !isDrink && hits(words, ["berry", "strawberry", "raspberry", "blueberry", "blackberry", "banana", "peach", "plum", "grape", "kiwi", "mango", "melon", "cherry", "pineapple", "tomato", "apricot"]) {
             matches.append(.frutasBlandas)
         }
-        if hits(tags, ["apple", "pear", "orange", "lemon", "lime", "grapefruit", "citrus"]) {
+        if !isDrink && hits(words, ["apple", "pear", "orange", "lemon", "lime", "grapefruit", "citrus"]) {
             matches.append(.frutasFirmes)
         }
-        if hits(tags, ["canned", "tinned"]) {
+        if isDrink || hits(words, ["canned", "tinned", "conserve", "enlatado", "bread", "breads", "pain", "pan", "egg", "eggs"]) {
             matches.append(.otros)
         }
 
@@ -116,12 +121,8 @@ enum FoodCategory: String, CaseIterable, Identifiable, Codable {
             return moreUrgent(matches)
         }
 
-        // Sin etiqueta concreta: la duda se resuelve por el mínimo de días.
-        if hits(tags, ["juice", "nectar", "beverage", "drink", "soda", "tea", "coffee", "water"]) {
-            return .otros
-        }
-        if hits(tags, ["fruit"]) { return .frutasBlandas }
-        if hits(tags, ["meat"]) { return .carneMolida }
+        if !isDrink && hits(words, ["fruit", "fruits", "fruta"]) { return .frutasBlandas }
+        if !plantBased && hits(words, ["meat", "meats", "viande", "carne"]) { return .carneMolida }
         return .otros
     }
 
@@ -174,17 +175,44 @@ enum FoodCategory: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// `cold-cut` se busca tal cual. El resto compara palabras, así "ham" no entra en "hamburger"
-    /// ni "apple" en "pineapple". El +3 cubre plurales (`milks`, `dairies`).
-    private static func hits(_ tags: String, _ keywords: [String]) -> Bool {
-        let tokens = tags.split { !$0.isLetter }.map(String.init)
-        return keywords.contains { keyword in
-            if keyword.contains("-") {
-                return tags.contains(keyword)
+    /// Parte cada etiqueta por `:`, `-`, `_` y espacios. La clave solo gana si
+    /// todas sus palabras están tal cual (así `pan` no pega en `spanish`).
+    /// Se omiten las etiquetas `*-based-foods*`: van en casi todo vegetal y
+    /// disparan «bebida» o «verdura». `en:beverages` sí se conserva.
+    private static func tokens(from tags: [String]) -> Set<String> {
+        var words = Set<String>()
+        for tag in tags {
+            let lower = tag.lowercased()
+            if lower.contains("-based-foods") { continue }
+            let pieces = lower.split { character in
+                character == ":" || character == "-" || character == "_" || character.isWhitespace
             }
-            return tokens.contains { token in
-                token == keyword || (token.hasPrefix(keyword) && token.count <= keyword.count + 3)
+            for piece in pieces where !piece.isEmpty {
+                insertWord(String(piece), into: &words)
             }
+        }
+        return words
+    }
+
+    /// Guarda la palabra y su singular: berries→berry, tomatoes→tomato, apples→apple.
+    private static func insertWord(_ word: String, into words: inout Set<String>) {
+        words.insert(word)
+        if word.hasSuffix("ies"), word.count > 3 {
+            words.insert(String(word.dropLast(3)) + "y")
+        } else if word.hasSuffix("es"), word.count > 2 {
+            words.insert(String(word.dropLast(2)))
+            words.insert(String(word.dropLast(1)))
+        } else if word.hasSuffix("s"), word.count > 1 {
+            words.insert(String(word.dropLast(1)))
+        }
+    }
+
+    private static func hits(_ words: Set<String>, _ keywords: [String]) -> Bool {
+        keywords.contains { keyword in
+            let parts = keyword.lowercased().split { character in
+                character == ":" || character == "-" || character == "_" || character.isWhitespace
+            }.map(String.init)
+            return !parts.isEmpty && parts.allSatisfy(words.contains)
         }
     }
 }

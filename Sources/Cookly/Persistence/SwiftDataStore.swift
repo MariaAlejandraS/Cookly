@@ -1,3 +1,4 @@
+#if !NO_SWIFTDATA
 import Combine
 import Foundation
 import SwiftData
@@ -16,6 +17,7 @@ final class ProductEntity {
     var barcode: String?
     var imageURL: String?
     var createdAt: Date
+    var ownerId: UUID = UUID()
 
     init(
         id: UUID,
@@ -27,7 +29,8 @@ final class ProductEntity {
         notes: String,
         barcode: String?,
         imageURL: String?,
-        createdAt: Date
+        createdAt: Date,
+        ownerId: UUID
     ) {
         self.id = id
         self.name = name
@@ -39,6 +42,7 @@ final class ProductEntity {
         self.barcode = barcode
         self.imageURL = imageURL
         self.createdAt = createdAt
+        self.ownerId = ownerId
     }
 }
 
@@ -48,12 +52,54 @@ final class ReminderEntity {
     var title: String
     var date: Date
     var isDone: Bool
+    var hour: Int = 8
+    var minute: Int = 0
+    /// Días "1,2,3". Vacío = una sola vez.
+    var weekdays: String = ""
+    var isEnabled: Bool = true
+    var ownerId: UUID = UUID()
 
-    init(id: UUID, title: String, date: Date, isDone: Bool) {
+    init(
+        id: UUID,
+        title: String,
+        date: Date,
+        isDone: Bool,
+        hour: Int,
+        minute: Int,
+        weekdays: String,
+        isEnabled: Bool,
+        ownerId: UUID
+    ) {
         self.id = id
         self.title = title
         self.date = date
         self.isDone = isDone
+        self.hour = hour
+        self.minute = minute
+        self.weekdays = weekdays
+        self.isEnabled = isEnabled
+        self.ownerId = ownerId
+    }
+}
+
+@Model
+final class UserEntity {
+    @Attribute(.unique) var id: UUID = UUID()
+    var name: String = ""
+    var username: String = ""
+    var passwordHash: String = ""
+    var salt: String = ""
+    var createdAt: Date = Date.now
+    var hashVersion: Int = 1
+
+    init(id: UUID, name: String, username: String, passwordHash: String, salt: String, createdAt: Date, hashVersion: Int) {
+        self.id = id
+        self.name = name
+        self.username = username
+        self.passwordHash = passwordHash
+        self.salt = salt
+        self.createdAt = createdAt
+        self.hashVersion = hashVersion
     }
 }
 
@@ -71,7 +117,7 @@ final class SwiftDataStore: LocalStore {
 
     /// El inicializador más simple de iOS 17. Sin CloudKit ni configuración extra.
     init() throws {
-        let container = try ModelContainer(for: ProductEntity.self, ReminderEntity.self)
+        let container = try ModelContainer(for: ProductEntity.self, ReminderEntity.self, UserEntity.self)
         self.container = container
         self.context = container.mainContext
     }
@@ -93,12 +139,13 @@ final class SwiftDataStore: LocalStore {
     }
 
     func insert(_ product: Product) {
+        guard ownsAccount(product.ownerId) else { return }
         context.insert(entity(from: product))
         saveAndNotify()
     }
 
-    func update(_ product: Product) {
-        guard let entity = findProduct(id: product.id) else { return }
+    func update(_ product: Product, ownerId: UUID) {
+        guard let entity = findProduct(id: product.id), entity.ownerId == ownerId else { return }
         entity.name = product.name
         entity.categoryRaw = product.category.rawValue
         entity.quantity = product.quantity
@@ -111,13 +158,18 @@ final class SwiftDataStore: LocalStore {
         saveAndNotify()
     }
 
-    func delete(_ product: Product) {
-        guard let entity = findProduct(id: product.id) else { return }
+    func delete(_ product: Product, ownerId: UUID) {
+        guard let entity = findProduct(id: product.id), entity.ownerId == ownerId else { return }
         context.delete(entity)
         saveAndNotify()
     }
 
     // MARK: - Recordatorios
+
+    func fetchProducts(ownerId: UUID) -> [Product] {
+        guard ownsAccount(ownerId) else { return [] }
+        return fetchProducts().filter { $0.ownerId == ownerId }
+    }
 
     func fetchReminders() -> [Reminder] {
         let descriptor = FetchDescriptor<ReminderEntity>(
@@ -132,22 +184,60 @@ final class SwiftDataStore: LocalStore {
     }
 
     func insert(_ reminder: Reminder) {
+        guard ownsAccount(reminder.ownerId) else { return }
         context.insert(entity(from: reminder))
         saveAndNotify()
     }
 
-    func update(_ reminder: Reminder) {
-        guard let entity = findReminder(id: reminder.id) else { return }
+    func update(_ reminder: Reminder, ownerId: UUID) {
+        guard let entity = findReminder(id: reminder.id), entity.ownerId == ownerId else { return }
         entity.title = reminder.title
         entity.date = reminder.date
         entity.isDone = reminder.isDone
+        entity.hour = reminder.hour
+        entity.minute = reminder.minute
+        entity.weekdays = reminder.weekdaysStorage
+        entity.isEnabled = reminder.isEnabled
         saveAndNotify()
     }
 
-    func delete(_ reminder: Reminder) {
-        guard let entity = findReminder(id: reminder.id) else { return }
+    func delete(_ reminder: Reminder, ownerId: UUID) {
+        guard let entity = findReminder(id: reminder.id), entity.ownerId == ownerId else { return }
         context.delete(entity)
         saveAndNotify()
+    }
+
+    func fetchReminders(ownerId: UUID) -> [Reminder] {
+        guard ownsAccount(ownerId) else { return [] }
+        return fetchReminders().filter { $0.ownerId == ownerId }
+    }
+
+    // MARK: - Cuentas
+
+    func fetchUsers() -> [User] {
+        let descriptor = FetchDescriptor<UserEntity>()
+        let rows = (try? context.fetch(descriptor)) ?? []
+        return rows.map(user(from:))
+    }
+
+    func insert(_ user: User) {
+        context.insert(entity(from: user))
+        saveAndNotify()
+    }
+
+    func update(_ user: User) {
+        guard let entity = findUser(id: user.id) else { return }
+        entity.name = user.name
+        entity.username = user.username
+        entity.passwordHash = user.passwordHash
+        entity.salt = user.salt
+        entity.createdAt = user.createdAt
+        entity.hashVersion = user.hashVersion
+        saveAndNotify()
+    }
+
+    private func ownsAccount(_ ownerId: UUID) -> Bool {
+        fetchUsers().contains { $0.id == ownerId }
     }
 
     // MARK: - Mapeo y guardado
@@ -175,6 +265,12 @@ final class SwiftDataStore: LocalStore {
         return rows.first { $0.id == id }
     }
 
+    private func findUser(id: UUID) -> UserEntity? {
+        let descriptor = FetchDescriptor<UserEntity>()
+        let rows = (try? context.fetch(descriptor)) ?? []
+        return rows.first { $0.id == id }
+    }
+
     private func product(from entity: ProductEntity) -> Product {
         Product(
             id: entity.id,
@@ -186,7 +282,8 @@ final class SwiftDataStore: LocalStore {
             notes: entity.notes,
             barcode: entity.barcode,
             imageURL: entity.imageURL,
-            createdAt: entity.createdAt
+            createdAt: entity.createdAt,
+            ownerId: entity.ownerId
         )
     }
 
@@ -201,15 +298,61 @@ final class SwiftDataStore: LocalStore {
             notes: product.notes,
             barcode: product.barcode,
             imageURL: product.imageURL,
-            createdAt: product.createdAt
+            createdAt: product.createdAt,
+            ownerId: product.ownerId
         )
     }
 
     private func reminder(from entity: ReminderEntity) -> Reminder {
-        Reminder(id: entity.id, title: entity.title, date: entity.date, isDone: entity.isDone)
+        Reminder(
+            id: entity.id,
+            title: entity.title,
+            date: entity.date,
+            isDone: entity.isDone,
+            hour: entity.hour,
+            minute: entity.minute,
+            weekdays: Reminder.weekdays(from: entity.weekdays),
+            isEnabled: entity.isEnabled,
+            ownerId: entity.ownerId
+        )
     }
 
     private func entity(from reminder: Reminder) -> ReminderEntity {
-        ReminderEntity(id: reminder.id, title: reminder.title, date: reminder.date, isDone: reminder.isDone)
+        ReminderEntity(
+            id: reminder.id,
+            title: reminder.title,
+            date: reminder.date,
+            isDone: reminder.isDone,
+            hour: reminder.hour,
+            minute: reminder.minute,
+            weekdays: reminder.weekdaysStorage,
+            isEnabled: reminder.isEnabled,
+            ownerId: reminder.ownerId
+        )
+    }
+
+    private func user(from entity: UserEntity) -> User {
+        User(
+            id: entity.id,
+            name: entity.name,
+            username: entity.username,
+            passwordHash: entity.passwordHash,
+            salt: entity.salt,
+            createdAt: entity.createdAt,
+            hashVersion: entity.hashVersion
+        )
+    }
+
+    private func entity(from user: User) -> UserEntity {
+        UserEntity(
+            id: user.id,
+            name: user.name,
+            username: user.username,
+            passwordHash: user.passwordHash,
+            salt: user.salt,
+            createdAt: user.createdAt,
+            hashVersion: user.hashVersion
+        )
     }
 }
+#endif

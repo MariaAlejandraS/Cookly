@@ -3,13 +3,22 @@ import SwiftUI
 /// Créditos del taller. Los nombres y el curso se muestran tal cual.
 struct AboutView: View {
     private let members = ["María Alejandra Solarte", "Ronal Santiago Valdez Jurado"]
-    private let technologies = ["SwiftUI", "MVVM", "SwiftData", "JSON", "URLSession", "Codable"]
+    private let technologies = [
+        "SwiftUI",
+        "MVVM",
+        "SwiftData",
+        "Cuentas locales con SHA-256",
+        "Cámara con AVFoundation",
+        "Open Food Facts por código de barras"
+    ]
+
+    var userName = ""
 
     var body: some View {
         ScrollView {
             VStack(spacing: CooklyTheme.space16) {
                 header
-                Text("Nevera digital: vencimientos, búsqueda en Open Food Facts y recordatorios de comidas.")
+                Text("Nevera digital: vencimientos, escaneo de códigos de barras y recordatorios de comidas.")
                     .font(.subheadline)
                     .foregroundStyle(CooklyTheme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -43,7 +52,7 @@ struct AboutView: View {
             Text("COOKLY")
                 .font(CooklyTheme.rounded(.title, weight: .bold))
                 .foregroundStyle(CooklyTheme.onGradient)
-            Text("Versión 1.0")
+            Text(userName.isEmpty ? "Versión 1.0" : "\(userName) · Versión 1.0")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(CooklyTheme.onGradient.opacity(0.75))
         }

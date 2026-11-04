@@ -11,11 +11,19 @@ protocol LocalStore: AnyObject {
 
     func fetchProducts() -> [Product]
     func insert(_ product: Product)
-    func update(_ product: Product)
-    func delete(_ product: Product)
+    func update(_ product: Product, ownerId: UUID)
+    func delete(_ product: Product, ownerId: UUID)
 
     func fetchReminders() -> [Reminder]
     func insert(_ reminder: Reminder)
-    func update(_ reminder: Reminder)
-    func delete(_ reminder: Reminder)
+    func update(_ reminder: Reminder, ownerId: UUID)
+    func delete(_ reminder: Reminder, ownerId: UUID)
+
+    func fetchUsers() -> [User]
+    func insert(_ user: User)
+    func update(_ user: User)
+
+    /// El filtro es Swift, después del fetch. No usa #Predicate.
+    func fetchProducts(ownerId: UUID) -> [Product]
+    func fetchReminders(ownerId: UUID) -> [Reminder]
 }

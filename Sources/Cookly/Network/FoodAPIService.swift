@@ -53,22 +53,6 @@ final class FoodAPIService: Sendable {
         self.session = session ?? .shared
     }
 
-    /// Busca productos por nombre. GET /cgi/search.pl?search_terms=...&json=1
-    func searchProducts(query: String) async throws -> [OFFProduct] {
-        var comps = URLComponents(string: "\(baseURL)/cgi/search.pl")
-        comps?.queryItems = [
-            URLQueryItem(name: "search_terms", value: query),
-            URLQueryItem(name: "search_simple", value: "1"),
-            URLQueryItem(name: "action", value: "process"),
-            URLQueryItem(name: "json", value: "1"),
-            URLQueryItem(name: "page_size", value: "20"),
-            URLQueryItem(name: "fields", value: fields)
-        ]
-        guard let url = comps?.url else { throw APIError.invalidURL }
-        let response: OFFSearchResponse = try await get(url)
-        return response.products
-    }
-
     /// Trae el detalle de un producto por código de barras. GET /api/v2/product/{code}.json
     func fetchProduct(barcode: String) async throws -> OFFProduct {
         var comps = URLComponents(string: "\(baseURL)/api/v2/product/\(barcode).json")
