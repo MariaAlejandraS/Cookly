@@ -11,26 +11,29 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.example.cookly.navigation.Screen
 
 /**
- * Barra inferior de la sección principal. Solo Nevera está activa;
- * Recordatorios queda visible pero deshabilitado.
+ * Barra inferior de la sección principal: Nevera y Recordatorios.
  */
 @Composable
 fun AppBottomBar(
-    neveraSelected: Boolean,
+    currentRoute: String,
     onNeveraClick: () -> Unit,
+    onRemindersClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
+    val neveraSelected = currentRoute == Screen.Nevera.route ||
+        currentRoute.startsWith("add_product")
+    val remindersSelected = currentRoute == Screen.Reminders.route
+
     val itemColors = NavigationBarItemDefaults.colors(
         selectedIconColor = colors.tertiary,
         selectedTextColor = colors.onBackground,
         indicatorColor = colors.tertiary.copy(alpha = 0.18f),
         unselectedIconColor = colors.onSurfaceVariant,
-        unselectedTextColor = colors.onSurfaceVariant,
-        disabledIconColor = colors.onSurfaceVariant.copy(alpha = 0.38f),
-        disabledTextColor = colors.onSurfaceVariant.copy(alpha = 0.38f)
+        unselectedTextColor = colors.onSurfaceVariant
     )
 
     NavigationBar(
@@ -46,9 +49,9 @@ fun AppBottomBar(
             colors = itemColors
         )
         NavigationBarItem(
-            selected = false,
-            enabled = false,
-            onClick = {},
+            selected = remindersSelected,
+            enabled = true,
+            onClick = onRemindersClick,
             icon = { Icon(Icons.Default.Notifications, contentDescription = "Recordatorios") },
             label = { Text("Recordatorios") },
             colors = itemColors

@@ -1,5 +1,6 @@
 package com.example.cookly.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,10 +18,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
@@ -31,35 +35,48 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cookly.data.FoodCategories
+import com.example.cookly.navigation.Screen
 import com.example.cookly.ui.components.AppBottomBar
 import com.example.cookly.ui.theme.CooklyWarning
+import com.example.cookly.viewmodel.AuthViewModel
 import com.example.cookly.viewmodel.NeveraViewModel
 import com.example.cookly.viewmodel.ProductUi
 
 @Composable
 fun NeveraScreen(
-    onOpenCamera: () -> Unit,
     onNavigateToAddProduct: () -> Unit,
-    viewModel: NeveraViewModel = viewModel()
+    onNavigateToEditProduct: (Int) -> Unit,
+    onNavigateToReminders: () -> Unit,
+    onNavigateToAbout: () -> Unit,
+    onLogout: () -> Unit,
+    viewModel: NeveraViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val products by viewModel.products.collectAsState()
     val colors = MaterialTheme.colorScheme
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = colors.background,
         bottomBar = {
             AppBottomBar(
-                neveraSelected = true,
-                onNeveraClick = {}
+                currentRoute = Screen.Nevera.route,
+                onNeveraClick = {},
+                onRemindersClick = onNavigateToReminders
             )
         }
     ) { innerPadding ->
@@ -83,16 +100,43 @@ fun NeveraScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Cámara: pendiente de implementar.
+                IconButton(onClick = onNavigateToAbout) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Acerca de",
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // Logout discreto: no usa el estilo relleno de cámara/+.
+                IconButton(onClick = { showLogoutDialog = true }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Logout,
+                        contentDescription = "Cerrar sesión",
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Cámara no implementada: se muestra deshabilitada a propósito.
                 FilledIconButton(
-                    onClick = onOpenCamera,
+                    onClick = {},
+                    enabled = false,
                     shape = CircleShape,
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = colors.tertiary,
-                        contentColor = colors.onTertiary
+                        contentColor = colors.onTertiary,
+                        disabledContainerColor = colors.outline.copy(alpha = 0.45f),
+                        disabledContentColor = colors.onSurfaceVariant.copy(alpha = 0.55f)
                     )
                 ) {
-                    Icon(Icons.Default.PhotoCamera, contentDescription = "Cámara")
+                    Icon(
+                        Icons.Default.PhotoCamera,
+                        contentDescription = "Cámara (no disponible aún)"
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -123,12 +167,39 @@ fun NeveraScreen(
                     items(products, key = { it.id }) { product ->
                         ProductCard(
                             product = product,
+                            onClick = { onNavigateToEditProduct(product.id) },
                             onDelete = { viewModel.deleteProduct(product) }
                         )
                     }
                 }
             }
         }
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("¿Cerrar sesión?") },
+            text = {
+                Text("Podrás volver a entrar con tu correo. Tus productos y recordatorios se conservan.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                        // Firebase + Credential Manager; luego el NavHost va a login.
+                        authViewModel.signOut(onLogout)
+                    }
+                ) {
+                    Text("Cerrar sesión", color = colors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
@@ -157,14 +228,19 @@ private fun EmptyNeveraState(modifier: Modifier = Modifier) {
 @Composable
 private fun ProductCard(
     product: ProductUi,
+    onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     // Recalcula en cada recomposición para que el badge cambie con el paso de los días.
     val daysRemaining = product.daysRemaining
+    val categoryIcon = FoodCategories.findByName(product.category)?.icon
+        ?: Icons.Default.Kitchen
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colors.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -175,6 +251,19 @@ private fun ProductCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Surface(
+                shape = CircleShape,
+                color = colors.tertiary.copy(alpha = 0.16f),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Icon(
+                    imageVector = categoryIcon,
+                    contentDescription = product.category,
+                    tint = colors.tertiary,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = product.name,
@@ -187,6 +276,7 @@ private fun ProductCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 ExpirationBadge(daysRemaining = daysRemaining)
             }
+            // IconButton consume el clic y no abre la edición de la tarjeta.
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,

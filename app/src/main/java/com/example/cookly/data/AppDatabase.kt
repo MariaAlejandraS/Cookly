@@ -5,15 +5,15 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-/** Base local de Cookly. Singleton para no abrir más de una conexión. */
+/** Base local de Cookly (productos y recordatorios). Los usuarios viven en Firebase. */
 @Database(
-    entities = [User::class, Product::class],
-    version = 1,
+    entities = [Product::class, Reminder::class],
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun userDao(): UserDao
     abstract fun productDao(): ProductDao
+    abstract fun reminderDao(): ReminderDao
 
     companion object {
         @Volatile
@@ -25,7 +25,11 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "cookly.db"
-                ).build().also { INSTANCE = it }
+                )
+                    // En desarrollo: al subir de versión se recrea la BD.
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
+                    .also { INSTANCE = it }
             }
         }
     }

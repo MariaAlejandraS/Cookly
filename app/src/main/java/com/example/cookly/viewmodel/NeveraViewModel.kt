@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cookly.data.AppDatabase
 import com.example.cookly.data.Product
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -13,15 +14,12 @@ import kotlinx.coroutines.launch
 
 private const val MILLIS_PER_DAY = 86_400_000L
 
-/**
- * Modelo de UI de un producto.
- * La fecha epoch no se expone: [daysRemaining] se recalcula al leerse
- * (cada recomposición de la lista).
- */
 data class ProductUi(
-    val id: Long,
+    val id: Int,
     val name: String,
-    private val expirationDate: Long
+    val category: String?,
+    private val expirationDate: Long,
+    private val userId: String
 ) {
     val daysRemaining: Int
         get() = ((expirationDate - System.currentTimeMillis()) / MILLIS_PER_DAY).toInt()
@@ -29,21 +27,26 @@ data class ProductUi(
     fun toEntity(): Product = Product(
         id = id,
         name = name,
-        expirationDate = expirationDate
+        expirationDate = expirationDate,
+        userId = userId,
+        category = category
     )
 }
 
 class NeveraViewModel(application: Application) : AndroidViewModel(application) {
 
     private val productDao = AppDatabase.getInstance(application).productDao()
+    private val userId: String = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
 
-    val products: StateFlow<List<ProductUi>> = productDao.getAllProducts()
+    val products: StateFlow<List<ProductUi>> = productDao.getAllProducts(userId)
         .map { list ->
             list.map { entity ->
                 ProductUi(
                     id = entity.id,
                     name = entity.name,
-                    expirationDate = entity.expirationDate
+                    category = entity.category,
+                    expirationDate = entity.expirationDate,
+                    userId = entity.userId
                 )
             }
         }
